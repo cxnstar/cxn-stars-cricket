@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CXN STARS Cricket Performance Dashboard">
+  <title>CXN STARS — Cricket Performance Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="bg-orb orb-a"></div><div class="bg-orb orb-b"></div>
+  <header class="topbar">
+    <a class="brand" href="#dashboard" data-page="dashboard">
+      <span class="brand-mark">CXN</span>
+      <span><strong>CXN STARS</strong><small>Cricket Performance</small></span>
+    </a>
+    <button class="mobile-menu" id="mobileMenu" aria-label="Open menu">☰</button>
+    <nav id="mainNav">
+      <a href="#dashboard" data-page="dashboard">Dashboard</a>
+      <a href="#players" data-page="players">Players</a>
+      <a href="#matches" data-page="matches">Matches</a>
+      <a href="#rankings" data-page="rankings">Rankings</a>
+      <a href="#leader" data-page="leader">Leader</a>
+      <a href="#analytics" data-page="analytics">Analytics</a>
+    </nav>
+    <div class="top-actions">
+      <button class="icon-btn" id="themeBtn" title="Day/Night mode">☀️</button>
+      <button class="admin-btn" id="adminBtn">Admin Login</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="page hero-page active" id="page-dashboard">
+      <div class="hero">
+        <div class="hero-copy reveal">
+          <div class="eyebrow"><span class="pulse"></span> LIVE TEAM PERFORMANCE CENTER</div>
+          <h1>CXN <span>STARS</span></h1>
+          <p>Every run. Every wicket. Every victory. One modern cricket performance hub for the whole team.</p>
+          <div class="hero-actions">
+            <a class="primary-btn animated-btn" href="#players">Explore Squad <span>→</span></a>
+            <a class="ghost-btn" href="#matches">View Results</a>
+          </div>
+          <div class="hero-mini">
+            <div><b id="heroPlayers">0</b><span>Players</span></div>
+            <div><b id="heroMatches">0</b><span>Matches</span></div>
+            <div><b id="heroWinRate">0%</b><span>Win rate</span></div>
+          </div>
+        </div>
+        <div class="hero-visual reveal">
+          <div class="scan-ring"></div>
+          <div class="captain-card">
+            <div class="captain-label">CAPTAIN</div>
+            <img src="assets/captain.jpg" alt="CXN STARS Captain">
+            <div class="captain-overlay"><strong>CXN STARS</strong><span>LEADERSHIP • PERFORMANCE • PRIDE</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head"><div><span class="section-kicker">TEAM OVERVIEW</span><h2>Performance at a glance</h2></div></div>
+      <div class="stats-grid" id="summaryCards"></div>
+
+      <div class="dashboard-grid">
+        <div class="panel">
+          <div class="panel-head"><div><span class="section-kicker">RESULTS</span><h3>Win / Loss record</h3></div><span class="live-chip">AUTO CALCULATED</span></div>
+          <div class="result-wrap">
+            <div class="donut" id="winDonut"><div><b id="donutText">0%</b><span>WIN RATE</span></div></div>
+            <div class="result-legend" id="resultLegend"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><span class="section-kicker">ACTIVITY</span><h3>Team progress</h3></div></div>
+          <div class="bar-list" id="progressBars"></div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid lower">
+        <div class="panel">
+          <div class="panel-head"><div><span class="section-kicker">LEADERS</span><h3>Top performers</h3></div><a href="#rankings">See all →</a></div>
+          <div id="topPerformers" class="performer-list"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><span class="section-kicker">RECENT</span><h3>Latest matches</h3></div><a href="#matches">All matches →</a></div>
+          <div id="recentMatches"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-players">
+      <div class="page-title"><div><span class="section-kicker">SQUAD DATABASE</span><h2>Players & performance</h2><p>Batting, bowling and match-by-match numbers are calculated automatically.</p></div><button class="primary-btn admin-only" id="addPlayerBtn">+ Add Player</button></div>
+      <div class="toolbar"><input id="playerSearch" placeholder="Search player..."><select id="roleFilter"><option value="all">All roles</option><option>Batsman</option><option>Bowler</option><option>All-rounder</option><option>Wicketkeeper</option></select></div>
+      <div class="player-grid" id="playerGrid"></div>
+    </section>
+
+    <section class="page" id="page-matches">
+      <div class="page-title"><div><span class="section-kicker">MATCH CENTER</span><h2>Every match result</h2><p>Track wins, losses, ties and no-results with complete score details.</p></div><button class="primary-btn admin-only" id="addMatchBtn">+ Record Match</button></div>
+      <div class="match-summary" id="matchSummary"></div>
+      <div class="panel table-panel"><div class="table-scroll"><table><thead><tr><th>Date</th><th>Opponent</th><th>Venue</th><th>Result</th><th>Score</th><th>Best Batter</th><th>Best Bowler</th><th class="admin-only">Action</th></tr></thead><tbody id="matchesTable"></tbody></table></div></div>
+    </section>
+
+    <section class="page" id="page-rankings">
+      <div class="page-title"><div><span class="section-kicker">LEADERBOARD</span><h2>Player rankings</h2><p>Ranked by runs, wickets and an all-round performance score.</p></div></div>
+      <div class="ranking-tabs"><button class="active" data-rank="batting">🏏 Batting</button><button data-rank="bowling">🎯 Bowling</button><button data-rank="allround">⭐ All-round</button></div>
+      <div class="panel table-panel"><div class="table-scroll"><table><thead id="rankingHead"></thead><tbody id="rankingBody"></tbody></table></div></div>
+    </section>
+
+    <section class="page" id="page-leader">
+      <div class="leader-hero">
+        <div class="leader-photo"><img src="assets/captain.jpg" alt="CXN STARS Captain"></div>
+        <div><span class="section-kicker">TEAM LEADER</span><h2>CXN STARS Captain</h2><p>Leading the team with confidence, discipline and performance.</p><div class="leader-badges"><span>CAPTAIN</span><span>TEAM LEADER</span><span>🏆 CXN STARS</span></div></div>
+      </div>
+      <div class="stats-grid" id="leaderStats"></div>
+      <div class="quote-card">“Lead from the front. Build the team. Play every ball with purpose.”</div>
+    </section>
+
+    <section class="page" id="page-analytics">
+      <div class="page-title"><div><span class="section-kicker">DEEP ANALYTICS</span><h2>Team intelligence</h2><p>See the numbers behind CXN STARS performance.</p></div></div>
+      <div class="analytics-grid">
+        <div class="panel"><div class="panel-head"><h3>Batting leaders</h3></div><div id="battingBars" class="chart-list"></div></div>
+        <div class="panel"><div class="panel-head"><h3>Bowling leaders</h3></div><div id="bowlingBars" class="chart-list"></div></div>
+      </div>
+      <div class="panel"><div class="panel-head"><h3>Team totals</h3></div><div class="analytics-kpis" id="analyticsKpis"></div></div>
+    </section>
+  </main>
+
+  <div class="modal" id="modal">
+    <div class="modal-box"><button class="modal-close" id="modalClose">×</button><div id="modalContent"></div></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <footer>© <span id="year"></span> CXN STARS • Cricket Performance Dashboard</footer>
+  <script src="js/app.js"></script>
+</body>
+</html>
