@@ -25,6 +25,7 @@
       <a href="#rankings" data-page="rankings">Rankings</a>
       <a href="#leader" data-page="leader">Leader</a>
       <a href="#analytics" data-page="analytics">Analytics</a>
+      <a href="#funds" data-page="funds">Funds</a>
     </nav>
     <div class="top-actions">
       <button class="icon-btn" id="themeBtn" title="Day/Night mode">☀️</button>
@@ -115,7 +116,15 @@
       <div class="quote-card">“Lead from the front. Build the team. Play every ball with purpose.”</div>
     </section>
 
-    <section class="page" id="page-analytics">
+    <section class="page" id="page-funds">
+<div class="page-title"><div><span class="section-kicker">PLAYER DUES</span><h2>Monthly Team Fund</h2><p>Every registered player pays <b>PKR 400 per month</b>. Admin marks each payment as paid and it is permanently recorded in that player's monthly history.</p></div></div>
+<div class="fund-toolbar"><label>History month <input id="fundMonthView" type="month"></label><button class="small-btn" id="fundPrevMonth">‹ Previous</button><button class="small-btn" id="fundNextMonth">Next ›</button></div>
+<div class="fund-kpis" id="fundKpis"></div>
+<div class="panel"><div class="panel-head"><div><span class="section-kicker">PAYMENT REGISTER</span><h3 id="fundRegisterTitle">Player payments</h3></div><span class="live-chip">PKR 400 / MONTH</span></div><div class="fund-table-wrap"><table class="fund-table"><thead><tr><th>Player</th><th>Month</th><th>Due</th><th>Status</th><th>Paid on</th><th>Admin action</th></tr></thead><tbody id="fundRegister"></tbody></table></div></div>
+<div class="panel fund-history-panel"><div class="panel-head"><div><span class="section-kicker">PLAYER HISTORY</span><h3>Monthly payment history</h3></div></div><div id="fundHistory"></div></div>
+<div class="panel"><div class="panel-head"><div><span class="section-kicker">USES OF FUNDS</span><h3>Team fund expenses</h3></div><button class="small-btn admin-only" id="addExpenseBtn">+ Add expense</button></div><div id="fundExpenses"></div></div>
+</section>
+<section class="page" id="page-analytics">
       <div class="page-title"><div><span class="section-kicker">DEEP ANALYTICS</span><h2>Team intelligence</h2><p>See the numbers behind CXN STARS performance.</p></div></div>
       <div class="analytics-grid">
         <div class="panel"><div class="panel-head"><h3>Batting leaders</h3></div><div id="battingBars" class="chart-list"></div></div>

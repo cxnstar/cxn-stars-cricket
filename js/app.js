@@ -1,9 +1,7 @@
 const KEY="cxnStarsDataV1", THEME="cxnStarsTheme", SESSION="cxnStarsAdmin";
 let data = loadData(), currentRank="batting", selectedPhoto="";
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-function loadData(){
-  try{return JSON.parse(localStorage.getItem(KEY))||{players:[],matches:[]}}catch{return{players:[],matches:[]}}
-}
+function loadData(){try{const d=JSON.parse(localStorage.getItem(KEY))||{};return {players:d.players||[],matches:d.matches||[],funds:d.funds||[],expenses:d.expenses||[],fundPayments:d.fundPayments||{}}}catch{return{players:[],matches:[],funds:[],expenses:[],fundPayments:{}}}}
 function save(){localStorage.setItem(KEY,JSON.stringify(data));renderAll()}
 function esc(v=""){return String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
@@ -29,7 +27,7 @@ function nav(page){
   if(location.hash!=="#"+page)history.replaceState(null,"","#"+page);
   $(".topbar").classList.remove("nav-open"); window.scrollTo({top:0,behavior:"smooth"});
 }
-function renderAll(){renderDashboard();renderPlayers();renderMatches();renderRankings();renderLeader();renderAnalytics();updateAdminUI()}
+function renderAll(){renderDashboard();renderPlayers();renderMatches();renderRankings();renderLeader();renderFunds();renderAnalytics();updateAdminUI()}
 function renderDashboard(){
  const t=totals(),c=resultCounts(),wr=winRate();
  $("#heroPlayers").textContent=data.players.length;$("#heroMatches").textContent=data.matches.length;$("#heroWinRate").textContent=wr+"%";
@@ -119,6 +117,26 @@ function renderLeader(){
  let p=data.players[0]||{}, t=totals();
  $("#leaderStats").innerHTML=[["🏏",t.runs,"TEAM RUNS"],["🎯",t.wickets,"TEAM WICKETS"],["🏆",winRate()+"%","WIN RATE"],["📅",data.matches.length,"MATCHES"]].map(x=>`<div class="stat-card"><div class="icon">${x[0]}</div><b>${x[1]}</b><span>${x[2]}</span></div>`).join("");
 }
+const MONTHLY_DUE=400;
+function money(n){return "PKR "+Number(n||0).toLocaleString()}
+function monthKey(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`}
+function monthLabel(k){if(!k)return "";let [y,m]=k.split("-").map(Number);return new Date(y,m-1,1).toLocaleDateString(undefined,{month:"long",year:"numeric"})}
+function ensureFundMonth(k){if(!data.fundPayments)data.fundPayments={};data.players.forEach(p=>{if(!data.fundPayments[p.id])data.fundPayments[p.id]={};if(!data.fundPayments[p.id][k])data.fundPayments[p.id][k]={amount:0,status:"unpaid",paidAt:""}})}
+function fundStats(k){ensureFundMonth(k);let due=data.players.length*MONTHLY_DUE,paid=data.players.reduce((n,p)=>n+(data.fundPayments[p.id][k]?.status==="paid"?MONTHLY_DUE:0),0);return {due,paid,remaining:due-paid,paidCount:Math.round(paid/MONTHLY_DUE),unpaidCount:data.players.length-Math.round(paid/MONTHLY_DUE)}}
+function renderFunds(){
+ let picker=$("#fundMonthView"); if(!picker)return; if(!picker.value)picker.value=monthKey(); const k=picker.value; ensureFundMonth(k); const st=fundStats(k);
+ $("#fundRegisterTitle").textContent=`Player payments • ${monthLabel(k)}`;
+ $("#fundKpis").innerHTML=[["👥","Players due",data.players.length],["💵","Monthly due",money(st.due)],["✅","Paid",money(st.paid)],["⏳","Remaining",money(st.remaining)]].map(x=>`<div class="fund-kpi"><div class="fund-icon">${x[0]}</div><b>${x[2]}</b><span>${x[1]}</span></div>`).join("");
+ $("#fundRegister").innerHTML=data.players.length?data.players.map(p=>{let q=data.fundPayments[p.id][k],paid=q.status==="paid";return `<tr><td><div class="fund-player"><div class="avatar">${photoHTML(p)}</div><strong>${esc(p.name)}</strong></div></td><td>${monthLabel(k)}</td><td><b>${money(MONTHLY_DUE)}</b></td><td><span class="fund-status ${paid?'paid':'unpaid'}">${paid?'PAID':'UNPAID'}</span></td><td>${paid?esc(q.paidAt):'—'}</td><td>${isAdmin()?(paid?`<button class="small-btn" onclick="markFundUnpaid('${p.id}','${k}')">Undo</button>`:`<button class="small-btn pay-btn" onclick="markFundPaid('${p.id}','${k}')">Mark paid</button>`):'<span class="muted">Admin only</span>'}</td></tr>`}).join(""):`<tr><td colspan="6"><div class="empty">Add players first. Each player will automatically have a PKR 400 monthly due record.</div></td></tr>`;
+ $("#fundHistory").innerHTML=data.players.length?data.players.map(p=>{let months=Object.entries((data.fundPayments||{})[p.id]||{}).sort((a,b)=>b[0].localeCompare(a[0]));return `<div class="fund-history-player"><div class="fund-history-head"><div class="fund-player"><div class="avatar">${photoHTML(p)}</div><strong>${esc(p.name)}</strong></div><b>${months.filter(([,q])=>q.status==='paid').length} paid months</b></div><div class="fund-months">${months.length?months.map(([m,q])=>`<span class="history-chip ${q.status==='paid'?'paid':'unpaid'}"><b>${monthLabel(m)}</b> • ${q.status==='paid'?money(MONTHLY_DUE)+' paid':'PKR 400 due'}</span>`).join(''):'<span class="muted">No payment history yet.</span>'}</div></div>`}).join(""):`<div class="empty">No players available.</div>`;
+ $("#fundExpenses").innerHTML=data.expenses.length?data.expenses.slice().reverse().map(e=>`<div class="expense-row"><span><strong>${esc(e.title)}</strong><small>${esc(e.date||"")} ${e.note?'• '+esc(e.note):''}</small></span><b class="expense-amount">− ${money(e.amount)}</b></div>`).join(""):'<div class="empty">No fund uses recorded yet.</div>';
+ updateAdminUI();
+}
+function markFundPaid(pid,k){if(!isAdmin())return login();ensureFundMonth(k);data.fundPayments[pid][k]={amount:MONTHLY_DUE,status:"paid",paidAt:new Date().toLocaleDateString()};save();toast("PKR 400 marked as paid")}
+function markFundUnpaid(pid,k){if(!isAdmin())return login();ensureFundMonth(k);data.fundPayments[pid][k]={amount:0,status:"unpaid",paidAt:""};save();toast("Payment marked unpaid")}
+function changeFundMonth(delta){let x=$("#fundMonthView"),d=new Date(x.value+"-01T00:00:00");d.setMonth(d.getMonth()+delta);x.value=monthKey(d);renderFunds()}
+function expenseForm(){return `<span class="section-kicker">FUND EXPENSE</span><h2>Record fund use</h2><div class="form-grid"><div class="form-group full"><label>Expense / use</label><input id="eTitle" placeholder="Ground booking, balls, kit, transport..."></div><div class="form-group"><label>Amount (PKR)</label><input id="eAmount" type="number" min="1"></div><div class="form-group"><label>Date</label><input id="eDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group full"><label>Details</label><input id="eNote" placeholder="What was purchased / paid?"></div></div><div class="modal-actions"><button class="ghost-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" id="saveExpense">Save expense</button></div>`}
+function addExpense(){if(!isAdmin())return login();openModal(expenseForm());$("#saveExpense").onclick=()=>{const title=$("#eTitle").value.trim(),amount=+$("#eAmount").value;if(!title||!amount)return toast("Enter expense and amount");data.expenses.push({id:id(),title,amount,date:$("#eDate").value,note:$("#eNote").value.trim()});save();closeModal();toast("Fund use recorded")}}
 function renderAnalytics(){
  let ps=[...data.players], maxR=Math.max(1,...ps.map(runs)),maxW=Math.max(1,...ps.map(wickets));
  $("#battingBars").innerHTML=ps.sort((a,b)=>runs(b)-runs(a)).slice(0,7).map(p=>`<div class="bar-row"><div class="bar-top"><b>${esc(p.name)}</b><span>${runs(p)} runs</span></div><div class="bar-track"><div class="bar-fill" data-width="${runs(p)/maxR*100}%"></div></div></div>`).join("")||"<span style='color:var(--muted)'>No player data.</span>";
@@ -138,7 +156,7 @@ $$("nav a").forEach(a=>a.onclick=e=>{e.preventDefault();nav(a.dataset.page)});
 $("#mobileMenu").onclick=()=>$(".topbar").classList.toggle("nav-open");
 $("#modalClose").onclick=closeModal;$("#modal").onclick=e=>{if(e.target.id==="modal")closeModal()};
 $("#adminBtn").onclick=()=>isAdmin()?logout():login();
-$("#addPlayerBtn").onclick=addPlayer;$("#addMatchBtn").onclick=addMatch;
+$("#addPlayerBtn").onclick=addPlayer;$("#addMatchBtn").onclick=addMatch;$("#addExpenseBtn").onclick=addExpense;$("#fundMonthView").onchange=renderFunds;$("#fundPrevMonth").onclick=()=>changeFundMonth(-1);$("#fundNextMonth").onclick=()=>changeFundMonth(1);
 $("#playerSearch").oninput=renderPlayers;$("#roleFilter").onchange=renderPlayers;
 $$(".ranking-tabs button").forEach(b=>b.onclick=()=>{$$(".ranking-tabs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");currentRank=b.dataset.rank;renderRankings()});
 $("#themeBtn").onclick=()=>{document.body.classList.toggle("light");localStorage.setItem(THEME,document.body.classList.contains("light")?"light":"dark");$("#themeBtn").textContent=document.body.classList.contains("light")?"🌙":"☀️"};
