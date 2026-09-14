@@ -23,6 +23,7 @@
       <a href="#players" data-page="players">Players</a>
       <a href="#matches" data-page="matches">Matches</a>
       <a href="#rankings" data-page="rankings">Rankings</a>
+      <a href="#performance" data-page="performance">Performance</a>
       <a href="#leader" data-page="leader">Leader</a>
       <a href="#analytics" data-page="analytics">Analytics</a>
       <a href="#funds" data-page="funds">Funds</a>
@@ -105,6 +106,45 @@
       <div class="page-title"><div><span class="section-kicker">LEADERBOARD</span><h2>Player rankings</h2><p>Ranked by runs, wickets and an all-round performance score.</p></div></div>
       <div class="ranking-tabs"><button class="active" data-rank="batting">🏏 Batting</button><button data-rank="bowling">🎯 Bowling</button><button data-rank="allround">⭐ All-round</button></div>
       <div class="panel table-panel"><div class="table-scroll"><table><thead id="rankingHead"></thead><tbody id="rankingBody"></tbody></table></div></div>
+    </section>
+
+    <section class="page" id="page-performance">
+      <div class="page-title">
+        <div><span class="section-kicker">PLAYER PERFORMANCE</span><h2>Record Player Performance</h2>
+        <p>Select an existing player, select the match, enter the performance, and save. Every match stays in history.</p></div>
+      </div>
+
+      <div class="performance-layout">
+        <div class="panel performance-form-panel">
+          <div class="panel-head"><div><span class="section-kicker">EASY ENTRY</span><h3>Match performance</h3></div></div>
+          <div class="form-grid">
+            <div class="form-group full"><label>Player</label><select id="pagePfPlayer"><option value="">Select player</option></select></div>
+            <div class="form-group full"><label>Match</label><select id="pagePfMatch"><option value="">Select match</option></select></div>
+            <div class="form-group"><label>Runs</label><input id="pagePfRuns" type="number" min="0" value="0"></div>
+            <div class="form-group"><label>Balls faced</label><input id="pagePfBalls" type="number" min="0" value="0"></div>
+            <div class="form-group"><label>Dismissed?</label><select id="pagePfDismissed"><option value="0">No — Not Out</option><option value="1">Yes — Out</option></select></div>
+            <div class="form-group"><label>Overs bowled</label><input id="pagePfOvers" type="number" min="0" step="0.1" value="0"></div>
+            <div class="form-group"><label>Runs conceded</label><input id="pagePfConceded" type="number" min="0" value="0"></div>
+            <div class="form-group"><label>Wickets</label><input id="pagePfWickets" type="number" min="0" value="0"></div>
+          </div>
+          <div class="performance-preview" id="performancePreview">
+            <div><b id="previewSR">0.00</b><span>Strike Rate</span></div>
+            <div><b id="previewEco">0.00</b><span>Economy</span></div>
+            <div><b id="previewAvg">0.00</b><span>Current Avg</span></div>
+          </div>
+          <div class="modal-actions">
+            <button class="ghost-btn" id="clearPerformanceBtn">Clear</button>
+            <button class="primary-btn admin-only" id="savePagePerformanceBtn">Save Performance</button>
+          </div>
+          <p class="form-hint">Tip: the same player can have a separate performance in every match. Saving another match never deletes the earlier record.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div><span class="section-kicker">HISTORY</span><h3>Match-by-match records</h3></div></div>
+          <div class="table-scroll"><table><thead><tr><th>Match</th><th>Player</th><th>Score</th><th>Average</th><th>Strike Rate</th><th>Economy</th><th class="admin-only">Action</th></tr></thead>
+          <tbody id="performanceTable"></tbody></table></div>
+        </div>
+      </div>
     </section>
 
     <section class="page" id="page-leader">
