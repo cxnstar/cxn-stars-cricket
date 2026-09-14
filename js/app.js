@@ -162,4 +162,4 @@ $$(".ranking-tabs button").forEach(b=>b.onclick=()=>{$$(".ranking-tabs button").
 $("#themeBtn").onclick=()=>{document.body.classList.toggle("light");localStorage.setItem(THEME,document.body.classList.contains("light")?"light":"dark");$("#themeBtn").textContent=document.body.classList.contains("light")?"🌙":"☀️"};
 if(localStorage.getItem(THEME)==="light"){$("body").classList.add("light");$("#themeBtn").textContent="🌙"}
 $("#year").textContent=new Date().getFullYear();
-let initial=(location.hash||"#dashboard").slice(1);nav(["dashboard","players","matches","rankings","leader","analytics"].includes(initial)?initial:"dashboard");renderAll();
+let initial=(location.hash||"#dashboard").slice(1);nav(["dashboard","players","matches","rankings","leader","analytics","funds"].includes(initial)?initial:"dashboard");renderAll();
