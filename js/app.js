@@ -1,11 +1,12 @@
-const KEY="cxnStarsDataV1", THEME="cxnStarsTheme", SESSION="cxnStarsAdmin";
-let data = loadData(), currentRank="batting", selectedPhoto="";
+const SUPABASE_URL="https://yjxvkgnhtnnjzdhhvgdy.supabase.co";
+const SUPABASE_KEY="sb_publishable_DIB9FH_sTyGBXbFgOiXOGA_m4K9W-PN";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const THEME="cxnStarsTheme";
+let data={players:[],matches:[],fundPayments:{},expenses:[]}, currentRank="batting", selectedPhoto="", adminSession=null;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-function loadData(){try{const d=JSON.parse(localStorage.getItem(KEY))||{};return {players:d.players||[],matches:d.matches||[],funds:d.funds||[],expenses:d.expenses||[],fundPayments:d.fundPayments||{}}}catch{return{players:[],matches:[],funds:[],expenses:[],fundPayments:{}}}}
-function save(){localStorage.setItem(KEY,JSON.stringify(data));renderAll()}
 function esc(v=""){return String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
-function isAdmin(){return localStorage.getItem(SESSION)==="1"}
+function isAdmin(){return !!adminSession}
 function fmt(n){return Number(n||0).toFixed(2)}
 function runs(p){return +p.runs||0}
 function wickets(p){return +p.wickets||0}
@@ -15,6 +16,11 @@ function sr(p){return balls(p)?fmt(runs(p)/balls(p)*100):"0.00"}
 function overs(p){return +p.overs||0}
 function eco(p){return overs(p)?fmt((+p.conceded||0)/overs(p)):"0.00"}
 function photoHTML(p){return p.photo?`<img src="${esc(p.photo)}" alt="${esc(p.name)}">`:esc((p.name||"?").slice(0,1).toUpperCase())}
+async function loadFromSupabase(){try{const [pr,mr,fr,er]=await Promise.all([sb.from("players").select("*").order("created_at",{ascending:true}),sb.from("matches").select("*").order("match_date",{ascending:false}),sb.from("player_funds").select("*").order("payment_month",{ascending:false}),sb.from("fund_expenses").select("*").order("expense_date",{ascending:false})]);if(pr.error)throw pr.error;if(mr.error)throw mr.error;if(fr.error)throw fr.error;if(er.error)throw er;data.players=(pr.data||[]).map(p=>({id:String(p.id),name:p.name,jersey:p.jersey,role:p.role,photo:p.photo,runs:p.runs||0,balls:p.balls||0,dismissals:p.dismissals||0,wickets:p.wickets||0,overs:p.overs||0,conceded:p.conceded||0,matches:p.matches||0}));data.matches=(mr.data||[]).map(m=>({id:String(m.id),date:m.match_date,opponent:m.opponent,venue:m.venue,result:m.result,score:m.score,oppScore:m.opp_score,batter:m.batter,bowler:m.bowler,notes:m.notes}));data.fundPayments={};(fr.data||[]).forEach(f=>{let pid=String(f.player_id),k=String(f.payment_month).slice(0,7);if(!data.fundPayments[pid])data.fundPayments[pid]={};data.fundPayments[pid][k]={amount:+f.amount||0,status:f.status||"unpaid",paidAt:f.paid_at?new Date(f.paid_at).toLocaleDateString():"",dbId:f.id}});data.expenses=(er.data||[]).map(e=>({id:String(e.id),title:e.title,amount:+e.amount||0,date:e.expense_date,note:e.note||""}));ensureFundMonth(monthKey());renderAll()}catch(e){console.error(e);toast("Supabase data load failed")}}
+async function savePlayerToDB(p){const row={name:p.name,jersey:p.jersey?+p.jersey:null,role:p.role,photo:p.photo||null,runs:runs(p),balls:balls(p),dismissals:+p.dismissals||0,wickets:wickets(p),overs:overs(p),conceded:+p.conceded||0,matches:+p.matches||0};const q=p.id&&/^\d+$/.test(String(p.id))?sb.from("players").update(row).eq("id",p.id):sb.from("players").insert(row).select().single();const {data:r,error}=await q;if(error)throw error;if(r)p.id=String(r.id)}
+async function deletePlayerDB(pid){const {error}=await sb.from("players").delete().eq("id",pid);if(error)throw error}
+async function saveMatchToDB(m){const row={match_date:m.date||null,opponent:m.opponent,venue:m.venue,result:m.result,score:m.score||null,opp_score:m.oppScore||null,batter:m.batter||null,bowler:m.bowler||null,notes:m.notes||null};const q=m.id&&/^\d+$/.test(String(m.id))?sb.from("matches").update(row).eq("id",m.id):sb.from("matches").insert(row).select().single();const {data:r,error}=await q;if(error)throw error;if(r)m.id=String(r.id)}
+async function deleteMatchDB(mid){const {error}=await sb.from("matches").delete().eq("id",mid);if(error)throw error}
 function totals(){return data.players.reduce((a,p)=>{a.runs+=runs(p);a.wickets+=wickets(p);a.matches=Math.max(a.matches,+p.matches||0);return a},{runs:0,wickets:0,matches:0})}
 function resultCounts(){return data.matches.reduce((a,m)=>{let r=(m.result||"").toLowerCase();if(r==="win")a.win++;else if(r==="loss"||r==="lose")a.loss++;else if(r==="tie")a.tie++;else a.nr++;return a},{win:0,loss:0,tie:0,nr:0})}
 function winRate(){let c=resultCounts(),played=c.win+c.loss+c.tie;return played?Math.round(c.win/played*100):0}
@@ -81,9 +87,9 @@ function playerForm(p={}){
  <div class="modal-actions"><button class="ghost-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" id="savePlayer">Save Player</button></div>`;
 }
 function bindPhoto(){let f=$("#fPhoto");if(!f)return;f.onchange=()=>{let file=f.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{selectedPhoto=r.result;$("#photoPreview").innerHTML=`<img src="${selectedPhoto}">`};r.readAsDataURL(file)}}
-function addPlayer(){if(!isAdmin())return login();openModal(playerForm());bindPhoto();$("#savePlayer").onclick=()=>{let name=$("#fName").value.trim();if(!name)return toast("Enter player name");data.players.push({id:id(),name,jersey:$("#fJersey").value,role:$("#fRole").value,photo:selectedPhoto,runs:+$("#fRuns").value||0,balls:+$("#fBalls").value||0,dismissals:+$("#fDismissals").value||0,wickets:+$("#fWickets").value||0,overs:+$("#fOvers").value||0,conceded:+$("#fConceded").value||0,matches:+$("#fMatches").value||0});save();closeModal();toast("Player added")}}
-function editPlayer(pid){if(!isAdmin())return login();let p=data.players.find(x=>x.id===pid);if(!p)return;openModal(playerForm(p));bindPhoto();$("#savePlayer").onclick=()=>{Object.assign(p,{name:$("#fName").value.trim(),jersey:$("#fJersey").value,role:$("#fRole").value,photo:selectedPhoto,runs:+$("#fRuns").value||0,balls:+$("#fBalls").value||0,dismissals:+$("#fDismissals").value||0,wickets:+$("#fWickets").value||0,overs:+$("#fOvers").value||0,conceded:+$("#fConceded").value||0,matches:+$("#fMatches").value||0});save();closeModal();toast("Player updated")}}
-function deletePlayer(pid){if(!isAdmin())return;let p=data.players.find(x=>x.id===pid);if(confirm(`Delete ${p?.name||"player"}?`)){data.players=data.players.filter(x=>x.id!==pid);save();toast("Player deleted")}}
+async function addPlayer(){if(!isAdmin())return login();openModal(playerForm());bindPhoto();$("#savePlayer").onclick=async()=>{let name=$("#fName").value.trim();if(!name)return toast("Enter player name");let p={name,jersey:$("#fJersey").value,role:$("#fRole").value,photo:selectedPhoto,runs:+$("#fRuns").value||0,balls:+$("#fBalls").value||0,dismissals:+$("#fDismissals").value||0,wickets:+$("#fWickets").value||0,overs:+$("#fOvers").value||0,conceded:+$("#fConceded").value||0,matches:+$("#fMatches").value||0};try{await savePlayerToDB(p);data.players.push(p);ensureFundMonth(monthKey());closeModal();renderAll();toast("Player added")}catch(e){console.error(e);toast("Player save failed")}}}
+async function editPlayer(pid){if(!isAdmin())return login();let p=data.players.find(x=>x.id===pid);if(!p)return;openModal(playerForm(p));bindPhoto();$("#savePlayer").onclick=async()=>{Object.assign(p,{name:$("#fName").value.trim(),jersey:$("#fJersey").value,role:$("#fRole").value,photo:selectedPhoto,runs:+$("#fRuns").value||0,balls:+$("#fBalls").value||0,dismissals:+$("#fDismissals").value||0,wickets:+$("#fWickets").value||0,overs:+$("#fOvers").value||0,conceded:+$("#fConceded").value||0,matches:+$("#fMatches").value||0});try{await savePlayerToDB(p);closeModal();renderAll();toast("Player updated")}catch(e){console.error(e);toast("Player update failed")}}}
+async function deletePlayer(pid){if(!isAdmin())return;if(confirm("Delete this player?")){try{await deletePlayerDB(pid);data.players=data.players.filter(p=>String(p.id)!==String(pid));delete data.fundPayments[pid];renderAll();toast("Player deleted")}catch(e){console.error(e);toast("Delete failed")}}}
 function matchForm(){
  return `<span class="section-kicker">MATCH CENTER</span><h2>Record match</h2><div class="form-grid">
  <div class="form-group"><label>Date</label><input id="mDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
@@ -97,14 +103,14 @@ function matchForm(){
  <div class="form-group full"><label>Notes</label><input id="mNotes" placeholder="Optional match notes"></div></div>
  <div class="modal-actions"><button class="ghost-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" id="saveMatch">Save Match</button></div>`;
 }
-function addMatch(){if(!isAdmin())return login();openModal(matchForm());$("#saveMatch").onclick=()=>{let opponent=$("#mOpponent").value.trim();if(!opponent)return toast("Enter opponent");data.matches.push({id:id(),date:$("#mDate").value,opponent,venue:$("#mVenue").value,result:$("#mResult").value,score:$("#mScore").value,oppScore:$("#mOppScore").value,batter:$("#mBatter").value,bowler:$("#mBowler").value,notes:$("#mNotes").value});save();closeModal();toast("Match recorded")}}
+async function addMatch(){if(!isAdmin())return login();openModal(matchForm());$("#saveMatch").onclick=async()=>{let opponent=$("#mOpponent").value.trim();if(!opponent)return toast("Enter opponent");let m={date:$("#mDate").value,opponent,venue:$("#mVenue").value,result:$("#mResult").value,score:$("#mScore").value,oppScore:$("#mOppScore").value,batter:$("#mBatter").value,bowler:$("#mBowler").value,notes:$("#mNotes").value};try{await saveMatchToDB(m);data.matches.push(m);closeModal();renderAll();toast("Match recorded")}catch(e){console.error(e);toast("Match save failed")}}}
 function renderMatches(){
  let c=resultCounts();$("#matchSummary").innerHTML=[["MATCHES",data.matches.length],["WINS",c.win],["LOSSES",c.loss],["WIN RATE",winRate()+"%"]].map(x=>`<div class="match-kpi"><b>${x[1]}</b><span>${x[0]}</span></div>`).join("");
  let ms=[...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
  $("#matchesTable").innerHTML=ms.length?ms.map(m=>`<tr><td>${esc(m.date)}</td><td><strong>${esc(m.opponent)}</strong></td><td>${esc(m.venue)}</td><td><b class="result-${(m.result||"").toLowerCase()}">${esc((m.result||"").toUpperCase())}</b></td><td>${esc(m.score||"-")}<br><small>${esc(m.oppScore||"")}</small></td><td>${esc(m.batter||"-")}</td><td>${esc(m.bowler||"-")}</td><td class="admin-only"><button class="small-btn danger" onclick="deleteMatch('${m.id}')">Delete</button></td></tr>`).join(""):`<tr><td colspan="8" style="text-align:center;padding:45px;color:var(--muted)">No matches recorded yet.</td></tr>`;
  updateAdminUI();
 }
-function deleteMatch(mid){if(!isAdmin())return; if(confirm("Delete this match result?")){data.matches=data.matches.filter(m=>m.id!==mid);save();toast("Match deleted")}}
+async function deleteMatch(mid){if(!isAdmin())return;if(confirm("Delete this match result?")){try{await deleteMatchDB(mid);data.matches=data.matches.filter(m=>String(m.id)!==String(mid));renderAll();toast("Match deleted")}catch(e){console.error(e);toast("Delete failed")}}}
 function renderRankings(){
  let ps=[...data.players], head, rows;
  if(currentRank==="batting"){ps.sort((a,b)=>runs(b)-runs(a));head=["#","Player","Role","Runs","Average","SR","Matches"];rows=ps.map((p,i)=>[i+1,p.name,p.role,runs(p),avg(p),sr(p),+p.matches||0])}
@@ -132,11 +138,11 @@ function renderFunds(){
  $("#fundExpenses").innerHTML=data.expenses.length?data.expenses.slice().reverse().map(e=>`<div class="expense-row"><span><strong>${esc(e.title)}</strong><small>${esc(e.date||"")} ${e.note?'• '+esc(e.note):''}</small></span><b class="expense-amount">− ${money(e.amount)}</b></div>`).join(""):'<div class="empty">No fund uses recorded yet.</div>';
  updateAdminUI();
 }
-function markFundPaid(pid,k){if(!isAdmin())return login();ensureFundMonth(k);data.fundPayments[pid][k]={amount:MONTHLY_DUE,status:"paid",paidAt:new Date().toLocaleDateString()};save();toast("PKR 400 marked as paid")}
-function markFundUnpaid(pid,k){if(!isAdmin())return login();ensureFundMonth(k);data.fundPayments[pid][k]={amount:0,status:"unpaid",paidAt:""};save();toast("Payment marked unpaid")}
+async function markFundPaid(pid,k){if(!isAdmin())return login();ensureFundMonth(k);let q=data.fundPayments[pid][k];try{if(q?.dbId){let {error}=await sb.from("player_funds").update({amount:MONTHLY_DUE,status:"paid",paid_at:new Date().toISOString()}).eq("id",q.dbId);if(error)throw error}else{let {data:r,error}=await sb.from("player_funds").insert({player_id:+pid,payment_month:k+"-01",amount:MONTHLY_DUE,status:"paid",paid_at:new Date().toISOString()}).select().single();if(error)throw error;q={dbId:r.id}}data.fundPayments[pid][k]={amount:MONTHLY_DUE,status:"paid",paidAt:new Date().toLocaleDateString(),dbId:q.dbId};renderAll();toast("PKR 400 marked as paid")}catch(e){console.error(e);toast("Payment update failed")}}
+async function markFundUnpaid(pid,k){if(!isAdmin())return login();let q=data.fundPayments[pid]?.[k];try{if(q?.dbId){let {error}=await sb.from("player_funds").update({amount:0,status:"unpaid",paid_at:null}).eq("id",q.dbId);if(error)throw error}data.fundPayments[pid][k]={amount:0,status:"unpaid",paidAt:"",dbId:q?.dbId};renderAll();toast("Payment marked unpaid")}catch(e){console.error(e);toast("Payment update failed")}}
 function changeFundMonth(delta){let x=$("#fundMonthView"),d=new Date(x.value+"-01T00:00:00");d.setMonth(d.getMonth()+delta);x.value=monthKey(d);renderFunds()}
 function expenseForm(){return `<span class="section-kicker">FUND EXPENSE</span><h2>Record fund use</h2><div class="form-grid"><div class="form-group full"><label>Expense / use</label><input id="eTitle" placeholder="Ground booking, balls, kit, transport..."></div><div class="form-group"><label>Amount (PKR)</label><input id="eAmount" type="number" min="1"></div><div class="form-group"><label>Date</label><input id="eDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group full"><label>Details</label><input id="eNote" placeholder="What was purchased / paid?"></div></div><div class="modal-actions"><button class="ghost-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" id="saveExpense">Save expense</button></div>`}
-function addExpense(){if(!isAdmin())return login();openModal(expenseForm());$("#saveExpense").onclick=()=>{const title=$("#eTitle").value.trim(),amount=+$("#eAmount").value;if(!title||!amount)return toast("Enter expense and amount");data.expenses.push({id:id(),title,amount,date:$("#eDate").value,note:$("#eNote").value.trim()});save();closeModal();toast("Fund use recorded")}}
+async function addExpense(){if(!isAdmin())return login();openModal(expenseForm());$("#saveExpense").onclick=async()=>{const title=$("#eTitle").value.trim(),amount=+$("#eAmount").value;if(!title||!amount)return toast("Enter expense and amount");try{const {data:r,error}=await sb.from("fund_expenses").insert({title,amount,expense_date:$("#eDate").value,note:$("#eNote").value.trim()}).select().single();if(error)throw error;data.expenses.push({id:String(r.id),title,amount,date:$("#eDate").value,note:$("#eNote").value.trim()});closeModal();renderAll();toast("Fund use recorded")}catch(e){console.error(e);toast("Expense save failed")}}}
 function renderAnalytics(){
  let ps=[...data.players], maxR=Math.max(1,...ps.map(runs)),maxW=Math.max(1,...ps.map(wickets));
  $("#battingBars").innerHTML=ps.sort((a,b)=>runs(b)-runs(a)).slice(0,7).map(p=>`<div class="bar-row"><div class="bar-top"><b>${esc(p.name)}</b><span>${runs(p)} runs</span></div><div class="bar-track"><div class="bar-fill" data-width="${runs(p)/maxR*100}%"></div></div></div>`).join("")||"<span style='color:var(--muted)'>No player data.</span>";
@@ -144,22 +150,19 @@ function renderAnalytics(){
  let t=totals();$("#analyticsKpis").innerHTML=[["Runs",t.runs],["Wickets",t.wickets],["Matches",data.matches.length],["Win rate",winRate()+"%"]].map(x=>`<div><b>${x[1]}</b><span>${x[0]}</span></div>`).join("");
  setTimeout(()=>$$(".bar-fill").forEach(x=>x.style.width=x.dataset.width),60);
 }
-function updateAdminUI(){
- let admin=isAdmin();$$(".admin-only").forEach(x=>x.style.display=admin?"":"none");$("#adminBtn").textContent=admin?"Admin Logout":"Admin Login";
-}
-function login(){
- openModal(`<span class="section-kicker">SECURE AREA</span><h2>Admin login</h2><p style="color:var(--muted)">Only the admin can add, edit or delete team data.</p><div class="form-grid"><div class="form-group full"><label>Username</label><input id="loginUser" value="admin"></div><div class="form-group full"><label>Password</label><input id="loginPass" type="password" placeholder="Enter admin password"></div></div><div class="modal-actions"><button class="ghost-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" id="doLogin">Login</button></div><small style="display:block;color:var(--muted);margin-top:12px">Demo starter credentials: admin / CXNStars@2026. Change the password in js/app.js before publishing.</small>`);
- $("#doLogin").onclick=()=>{if($("#loginUser").value==="admin"&&$("#loginPass").value==="CXNStars@2026"){localStorage.setItem(SESSION,"1");closeModal();updateAdminUI();toast("Admin mode enabled")}else toast("Wrong username or password")};
-}
-function logout(){localStorage.removeItem(SESSION);updateAdminUI();toast("Admin logged out")}
-$$("nav a").forEach(a=>a.onclick=e=>{e.preventDefault();nav(a.dataset.page)});
+function updateAdminUI(){let admin=isAdmin();$$('.admin-only').forEach(x=>x.style.display=admin?"":"none");$("#adminBtn").textContent=admin?"Admin Logout":"Admin Login"}
+function login(){openModal(`<span class="section-kicker">SECURE AREA</span><h2>Admin login</h2><p style="color:var(--muted)">Sign in with your Supabase admin account.</p><div class="form-grid"><div class="form-group full"><label>Email</label><input id="loginUser" type="email" autocomplete="username" placeholder="Admin email"></div><div class="form-group full"><label>Password</label><input id="loginPass" type="password" autocomplete="current-password" placeholder="Password"></div></div><div class="modal-actions"><button class="ghost-btn" onclick="closeModal()">Cancel</button><button class="primary-btn" id="doLogin">Login</button></div>`);$("#doLogin").onclick=async()=>{try{const {data:r,error}=await sb.auth.signInWithPassword({email:$("#loginUser").value.trim(),password:$("#loginPass").value});if(error)throw error;adminSession=r.session;closeModal();updateAdminUI();toast("Admin signed in")}catch(e){console.error(e);toast("Login failed")}}}
+async function logout(){await sb.auth.signOut();adminSession=null;updateAdminUI();toast("Admin logged out")}
+$$('nav a').forEach(a=>a.onclick=e=>{e.preventDefault();nav(a.dataset.page)});
 $("#mobileMenu").onclick=()=>$(".topbar").classList.toggle("nav-open");
 $("#modalClose").onclick=closeModal;$("#modal").onclick=e=>{if(e.target.id==="modal")closeModal()};
 $("#adminBtn").onclick=()=>isAdmin()?logout():login();
 $("#addPlayerBtn").onclick=addPlayer;$("#addMatchBtn").onclick=addMatch;$("#addExpenseBtn").onclick=addExpense;$("#fundMonthView").onchange=renderFunds;$("#fundPrevMonth").onclick=()=>changeFundMonth(-1);$("#fundNextMonth").onclick=()=>changeFundMonth(1);
 $("#playerSearch").oninput=renderPlayers;$("#roleFilter").onchange=renderPlayers;
-$$(".ranking-tabs button").forEach(b=>b.onclick=()=>{$$(".ranking-tabs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");currentRank=b.dataset.rank;renderRankings()});
+$$('.ranking-tabs button').forEach(b=>b.onclick=()=>{$$('.ranking-tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');currentRank=b.dataset.rank;renderRankings()});
 $("#themeBtn").onclick=()=>{document.body.classList.toggle("light");localStorage.setItem(THEME,document.body.classList.contains("light")?"light":"dark");$("#themeBtn").textContent=document.body.classList.contains("light")?"🌙":"☀️"};
 if(localStorage.getItem(THEME)==="light"){$("body").classList.add("light");$("#themeBtn").textContent="🌙"}
 $("#year").textContent=new Date().getFullYear();
-let initial=(location.hash||"#dashboard").slice(1);nav(["dashboard","players","matches","rankings","leader","analytics","funds"].includes(initial)?initial:"dashboard");renderAll();
+let initial=(location.hash||"#dashboard").slice(1);nav(["dashboard","players","matches","rankings","leader","analytics","funds"].includes(initial)?initial:"dashboard");
+sb.auth.getSession().then(({data:r})=>{adminSession=r.session;updateAdminUI();loadFromSupabase()});
+sb.auth.onAuthStateChange((_event,session)=>{adminSession=session;updateAdminUI()});
